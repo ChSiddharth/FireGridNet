@@ -691,6 +691,7 @@ elif page == "Incident Map":
 
 
 
+
 elif page == "Incident History":
     st.subheader("Incident History")
     st.write(
@@ -725,12 +726,20 @@ elif page == "Incident History":
                 "Timestamp (UTC)": incident["timestamp"],
                 "Image": incident["image_name"] or "Unknown",
                 "Record Type": (
-        "Weather Risk Assessment"
-        if incident["image_name"] == "Weather Risk Assessment"
-        else "AI Detection"
-    ),
-    "Objects Detected": incident["detection_count"],
+                    "Weather Risk Assessment"
+                    if incident["image_name"]
+                    == "Weather Risk Assessment"
+                    else "AI Detection"
+                ),
                 "Objects Detected": incident["detection_count"],
+                "Detection Details": detection_summary or "None",
+                "Latitude": incident["latitude"],
+                "Longitude": incident["longitude"],
+                "Status": incident["status"],
+                "Risk Score": incident["risk_score"],
+                "Risk Category": incident["risk_category"],
+            })
+
         st.dataframe(
             rows,
             use_container_width=True,
@@ -738,9 +747,9 @@ elif page == "Incident History":
         )
 
         st.caption(
-            "These are AI-generated detections, not confirmed "
-            "wildfire incidents. Location is shown only when "
-            "GPS metadata was available."
+            "AI detections and weather risk estimates are "
+            "different record types. Neither alone confirms "
+            "an actual wildfire."
         )
 
         st.subheader("Update Incident Status")
@@ -788,3 +797,4 @@ elif page == "Incident History":
 
     if st.button("Refresh Incident History"):
         st.rerun()
+
