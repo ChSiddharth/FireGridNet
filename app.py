@@ -12,7 +12,7 @@ st.set_page_config(
 
 @st.cache_resource
 def load_model():
-    return YOLO("/content/best.pt")
+    return YOLO("best.pt")
 
 model = load_model()
 
