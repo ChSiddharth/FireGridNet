@@ -580,7 +580,12 @@ elif page == "Risk Assessment":
 
 
     st.subheader("Wildfire Observation Map")
-
+elif page == "Incident Map":
+    st.subheader("Wildfire Observation Map")
+    st.write(
+        "Explore saved AI detections with available image GPS coordinates."
+    )
+    
     incidents = database.get_incidents()
 
     mapped_incidents = [
