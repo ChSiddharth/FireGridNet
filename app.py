@@ -610,7 +610,7 @@ elif page == "Risk Assessment":
     col1.metric("Saved Observations", len(incidents))
     col2.metric("Observations with GPS", len(mapped_incidents))
     col3.metric("Fire Detections", fire_count)
-    col4.metric("Smoke Detections", smoke_coun
+    col4.metric("Smoke Detections", smoke_count)
 
     if mapped_incidents:
         map_rows = []
