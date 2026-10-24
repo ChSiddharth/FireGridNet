@@ -579,11 +579,7 @@ elif page == "Risk Assessment":
 
 
 
-elif page == "Incident Map":
     st.subheader("Wildfire Observation Map")
-    st.write(
-        "Explore saved AI detections with available image GPS coordinates."
-    )
 
     incidents = database.get_incidents()
 
@@ -594,7 +590,7 @@ elif page == "Incident Map":
         and incident["longitude"] is not None
     ]
 
-        fire_count = 0
+    fire_count = 0
     smoke_count = 0
 
     for incident in incidents:
@@ -611,11 +607,10 @@ elif page == "Incident Map":
                 smoke_count += 1
 
     col1, col2, col3, col4 = st.columns(4)
-
     col1.metric("Saved Observations", len(incidents))
     col2.metric("Observations with GPS", len(mapped_incidents))
     col3.metric("Fire Detections", fire_count)
-    col4.metric("Smoke Detections", smoke_count)
+    col4.metric("Smoke Detections", smoke_coun
 
     if mapped_incidents:
         map_rows = []
