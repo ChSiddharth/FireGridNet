@@ -594,26 +594,28 @@ elif page == "Incident Map":
         and incident["longitude"] is not None
     ]
 
-    fire_count = 0
+        fire_count = 0
     smoke_count = 0
 
-for incident in incidents:
-    detections = json.loads(incident["detections_json"] or "[]")
+    for incident in incidents:
+        detections = json.loads(
+            incident["detections_json"] or "[]"
+        )
 
-    for detection in detections:
-        class_name = detection.get("class", "").lower()
+        for detection in detections:
+            class_name = detection.get("class", "").lower()
 
-        if "fire" in class_name:
-            fire_count += 1
-        elif "smoke" in class_name:
-            smoke_count += 1
+            if "fire" in class_name:
+                fire_count += 1
+            elif "smoke" in class_name:
+                smoke_count += 1
 
-col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Saved Observations", len(incidents))
-col2.metric("Observations with GPS", len(mapped_incidents))
-col3.metric("Fire Detections", fire_count)
-col4.metric("Smoke Detections", smoke_count)
+    col1.metric("Saved Observations", len(incidents))
+    col2.metric("Observations with GPS", len(mapped_incidents))
+    col3.metric("Fire Detections", fire_count)
+    col4.metric("Smoke Detections", smoke_count)
 
     if mapped_incidents:
         map_rows = []
