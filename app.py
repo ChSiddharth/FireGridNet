@@ -546,6 +546,7 @@ elif page == "Risk Assessment":
                 f"{weather['rain_24h']:.1f} mm",
             )
 
+            
             if st.button("Calculate Experimental Risk"):
                 score, category = calculate_risk(
                     weather["temperature"],
@@ -553,9 +554,27 @@ elif page == "Risk Assessment":
                     weather["rain_24h"],
                     weather["wind"],
                 )
+
                 st.metric("Experimental score", f"{score:.1f}/100")
                 st.progress(int(score))
                 st.write(f"**Prototype category:** {category} risk")
+
+                database.save_incident(
+                    image_name="Weather Risk Assessment",
+                    detections=[],
+                    latitude=lat,
+                    longitude=lon,
+                    location_source=selected_location,
+                    temperature=weather["temperature"],
+                    humidity=weather["humidity"],
+                    wind_speed=weather["wind"],
+                    rainfall_24h=weather["rain_24h"],
+                    risk_score=score,
+                    risk_category=category,
+                )
+
+                st.success("Risk assessment saved to incident history.")
+
 
     else:
         temperature = st.number_input(
