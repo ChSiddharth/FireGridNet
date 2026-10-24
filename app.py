@@ -4,17 +4,78 @@ import tempfile
 
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image, ExifTags
 from ultralytics import YOLO
 
 st.set_page_config(
-    page_title="FireGridNet",
+    page_title="FireGridNet | Wildfire Intelligence",
     page_icon="🔥",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
+
+st.markdown("""
+<style>
+.stApp {
+    background: #101114;
+    color: #F2F2F2;
+}
+[data-testid="stSidebar"] {
+    background: #191A1F;
+    border-right: 1px solid #303137;
+}
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+    max-width: 1450px;
+}
+h1, h2, h3 {
+    color: #F5F5F5 !important;
+}
+p, label, .stMarkdown {
+    color: #D2D2D7;
+}
+[data-testid="stMetric"] {
+    background: #1C1D23;
+    border: 1px solid #35363D;
+    padding: 18px;
+    border-radius: 12px;
+}
+[data-testid="stMetricLabel"] {
+    color: #B6B7C0;
+}
+[data-testid="stMetricValue"] {
+    color: #FF8A45;
+}
+.stButton > button {
+    background: #F47735;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    min-height: 42px;
+}
+.stButton > button:hover {
+    background: #FF965C;
+    color: white;
+    border: none;
+}
+hr {
+    border-color: #35363D;
+}
+div[data-testid="stAlert"] {
+    border-radius: 10px;
+}
+.small-muted {
+    color: #A6A7B0;
+    font-size: 0.9rem;
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_resource
@@ -22,11 +83,7 @@ def load_model():
     return YOLO("best.pt")
 
 
-model = load_model()
-
-
 def get_image_gps(image):
-    """Read GPS coordinates from EXIF metadata, if present."""
     try:
         exif = image.getexif()
         gps_tag = next(
@@ -67,7 +124,7 @@ def find_location(place):
     response = requests.get(
         GEOCODE_URL,
         params={"name": place, "count": 5, "language": "en"},
-        timeout=15
+        timeout=15,
     )
     response.raise_for_status()
     return response.json().get("results", [])
@@ -87,13 +144,12 @@ def get_weather(lat, lon):
             "past_hours": 24,
             "forecast_hours": 1,
             "wind_speed_unit": "kmh",
-            "timezone": "auto"
+            "timezone": "auto",
         },
-        timeout=20
+        timeout=20,
     )
     response.raise_for_status()
     data = response.json()
-
     current = data["current"]
     hourly = data.get("hourly", {})
     rain_values = [
@@ -108,7 +164,7 @@ def get_weather(lat, lon):
         "rain_now": current["precipitation"],
         "rain_24h": sum(rain_values),
         "time": current.get("time", "Unknown"),
-        "timezone": data.get("timezone", "Local time")
+        "timezone": data.get("timezone", "Local time"),
     }
 
 
@@ -133,31 +189,114 @@ def calculate_risk(temperature, humidity, rainfall, wind):
     return score, category
 
 
-st.title("🔥 FireGridNet")
-st.subheader("AI-Powered Wildfire Detection & Risk Assessment")
-st.write(
-    "Detect visible fire and smoke, retrieve weather for a selected "
-    "location, and calculate an experimental risk estimate."
-)
-st.info(
-    "Weather comes from a weather model for the selected coordinates. "
-    "It is not measured directly from the photograph or necessarily "
-    "at the exact forest site."
-)
+# Sidebar navigation
+with st.sidebar:
+    st.markdown("# 🔥 FireGridNet")
+    st.caption("WILDFIRE INTELLIGENCE PLATFORM")
+    st.divider()
 
-st.divider()
-
-left, right = st.columns(2)
-
-with left:
-    st.header("1. Fire & Smoke Detection")
-
-    uploaded_image = st.file_uploader(
-        "Upload a forest or wildfire image",
-        type=["jpg", "jpeg", "png"]
+    page = st.radio(
+        "NAVIGATION",
+        [
+            "Overview",
+            "AI Detection",
+            "Risk Assessment",
+            "Incident Map",
+            "Incident History",
+        ],
+        label_visibility="visible",
     )
 
-    image_gps = None
+    st.divider()
+    st.markdown("**SYSTEM STATUS**")
+    st.markdown("🟢 Application interface loaded")
+    st.markdown("🟠 AI model loads when required")
+    st.caption("Academic research prototype")
+
+
+# Header
+st.markdown(
+    '<p class="small-muted">WILDFIRE MONITORING / AI-POWERED ANALYSIS</p>',
+    unsafe_allow_html=True,
+)
+st.title("🔥 FireGridNet")
+st.caption(
+    "AI-Powered Wildfire Detection & Risk Assessment"
+)
+st.divider()
+
+
+if page == "Overview":
+    st.subheader("Monitoring Overview")
+    st.write(
+        "A unified workspace for visual fire detection, "
+        "weather analysis and wildfire incident monitoring."
+    )
+
+    a, b, c = st.columns(3)
+    a.metric("AI Model", "YOLO", "Fire + Smoke classes")
+    b.metric("Weather Source", "Open-Meteo", "Location-based estimates")
+    c.metric("Risk Engine", "Prototype", "Not operationally validated")
+
+    st.divider()
+    st.subheader("Monitoring Modules")
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("### 🔥 Visual Detection")
+        st.write(
+            "Analyse an uploaded image for possible fire and smoke, "
+            "with bounding boxes and confidence scores."
+        )
+        if st.button("Open AI Detection", use_container_width=True):
+            st.session_state["navigation_target"] = "AI Detection"
+            st.rerun()
+
+        st.markdown("### 🌦️ Environmental Risk")
+        st.write(
+            "Retrieve weather for a selected location and view "
+            "an experimental weather-based risk estimate."
+        )
+        if st.button("Open Risk Assessment", use_container_width=True):
+            st.session_state["navigation_target"] = "Risk Assessment"
+            st.rerun()
+
+    with right:
+        st.markdown("### 🗺️ Incident Geography")
+        st.write(
+            "The interactive incident map will be connected to "
+            "saved incident records in a later development stage."
+        )
+        if st.button("Open Incident Map", use_container_width=True):
+            st.session_state["navigation_target"] = "Incident Map"
+            st.rerun()
+
+        st.markdown("### 📋 Incident Records")
+        st.write(
+            "A persistent incident database and history dashboard "
+            "will be implemented in a later stage."
+        )
+        if st.button("Open Incident History", use_container_width=True):
+            st.session_state["navigation_target"] = "Incident History"
+            st.rerun()
+
+    st.info(
+        "No live incident feed is connected yet. This overview "
+        "does not represent confirmed active wildfires."
+    )
+
+
+elif page == "AI Detection":
+    st.subheader("AI Fire & Smoke Detection")
+    st.write(
+        "Upload an image to inspect possible visible fire or smoke."
+    )
+
+    uploaded_image = st.file_uploader(
+        "Choose an image",
+        type=["jpg", "jpeg", "png"],
+        key="detection_upload",
+    )
 
     if uploaded_image is not None:
         image = Image.open(uploaded_image)
@@ -167,12 +306,12 @@ with left:
         st.image(
             image,
             caption="Uploaded image",
-            use_container_width=True
+            use_container_width=True,
         )
 
         if image_gps:
             st.success(
-                f"Image GPS found: {image_gps[0]:.5f}, "
+                f"Image GPS: {image_gps[0]:.5f}, "
                 f"{image_gps[1]:.5f}"
             )
         else:
@@ -180,9 +319,8 @@ with left:
                 "No readable GPS coordinates found in image metadata."
             )
 
-        if st.button("Analyze Image"):
+        if st.button("Run AI Analysis", type="primary"):
             temp_path = None
-
             try:
                 with tempfile.NamedTemporaryFile(
                     suffix=".jpg", delete=False
@@ -190,35 +328,40 @@ with left:
                     image.save(temp.name)
                     temp_path = temp.name
 
-                result = model.predict(
-                    source=temp_path,
-                    conf=0.25,
-                    verbose=False
-                )[0]
+                with st.spinner("Analysing image with YOLO..."):
+                    model = load_model()
+                    result = model.predict(
+                        source=temp_path,
+                        conf=0.25,
+                        verbose=False,
+                    )[0]
 
                 plotted = result.plot()[:, :, ::-1]
+                st.subheader("Detection Results")
                 st.image(
                     plotted,
-                    caption="AI detection results",
-                    use_container_width=True
+                    caption="AI predictions",
+                    use_container_width=True,
                 )
 
                 if len(result.boxes) == 0:
                     st.warning(
-                        "No fire or smoke detected above the threshold. "
-                        "This does not prove the area is safe."
+                        "No fire or smoke detected above the current "
+                        "confidence threshold. This does not prove "
+                        "that the area is safe."
                     )
                 else:
                     st.success(
-                        f"Detected {len(result.boxes)} possible "
-                        "fire/smoke object(s)."
+                        f"{len(result.boxes)} possible object(s) detected."
                     )
 
                     for box in result.boxes:
                         class_id = int(box.cls[0].item())
                         confidence = float(box.conf[0].item())
+                        class_name = model.names[class_id]
+
                         st.write(
-                            f"**{model.names[class_id].title()}** — "
+                            f"**{class_name.title()}** — "
                             f"{confidence:.1%} confidence"
                         )
 
@@ -228,127 +371,125 @@ with left:
                 if temp_path and os.path.exists(temp_path):
                     os.remove(temp_path)
 
-with right:
-    st.header("2. Location & Weather")
 
-    location_mode = st.radio(
-        "Choose location method",
-        [
-            "Image GPS",
-            "Search for a place",
-            "Enter map coordinates"
-        ],
-        horizontal=False
+elif page == "Risk Assessment":
+    st.subheader("Environmental Risk Assessment")
+    st.caption(
+        "Weather data is model-based and may not represent conditions "
+        "at the exact forest site. The current score is illustrative."
     )
 
-    selected_location = None
+    mode = st.radio(
+        "Weather input",
+        ["Fetch automatically", "Enter manually"],
+        horizontal=True,
+    )
+
     lat = None
     lon = None
+    selected_location = None
 
-    if location_mode == "Image GPS":
-        if image_gps:
-            lat, lon = image_gps
-            selected_location = "Coordinates from image metadata"
-            st.write(f"Coordinates: {lat:.5f}, {lon:.5f}")
-        else:
-            st.warning(
-                "This image has no readable GPS data. Choose place "
-                "search or enter coordinates instead."
-            )
-
-    elif location_mode == "Search for a place":
-        place = st.text_input(
-            "Forest, national park, town, or place name"
+    if mode == "Fetch automatically":
+        location_mode = st.radio(
+            "Location method",
+            ["Search for a place", "Enter coordinates", "Image GPS"],
+            horizontal=True,
         )
 
-        if st.button("Find Location"):
-            if place.strip():
-                try:
-                    places = find_location(place.strip())
-                    if places:
+        if location_mode == "Search for a place":
+            place = st.text_input(
+                "Search for a forest, park, town or place"
+            )
+
+            if st.button("Find Location"):
+                if place.strip():
+                    try:
+                        places = find_location(place.strip())
                         st.session_state["places"] = places
-                    else:
-                        st.warning("No matching locations found.")
-                except requests.RequestException as error:
-                    st.error(f"Location search failed: {error}")
+                        if not places:
+                            st.warning("No matching places found.")
+                    except requests.RequestException as error:
+                        st.error(f"Location search failed: {error}")
+                else:
+                    st.warning("Enter a place name first.")
 
-        places = st.session_state.get("places", [])
-
-        if places:
-            choices = [
-                (
+            places = st.session_state.get("places", [])
+            if places:
+                choices = [
                     f"{p['name']}, {p.get('admin1', '')}, "
                     f"{p.get('country', '')} "
                     f"({p['latitude']:.3f}, {p['longitude']:.3f})"
-                )
-                for p in places
-            ]
-            chosen = st.selectbox("Choose the matching location", choices)
-            selected_index = choices.index(chosen)
-            selected_place = places[selected_index]
-            lat = selected_place["latitude"]
-            lon = selected_place["longitude"]
-            selected_location = chosen
+                    for p in places
+                ]
+                chosen = st.selectbox("Select matching place", choices)
+                selected_place = places[choices.index(chosen)]
+                lat = selected_place["latitude"]
+                lon = selected_place["longitude"]
+                selected_location = chosen
 
-    else:
-        lat = st.number_input(
-            "Latitude", min_value=-90.0, max_value=90.0,
-            value=20.0, format="%.5f"
-        )
-        lon = st.number_input(
-            "Longitude", min_value=-180.0, max_value=180.0,
-            value=78.0, format="%.5f"
-        )
-        selected_location = "Manually entered coordinates"
+        elif location_mode == "Enter coordinates":
+            lat = st.number_input(
+                "Latitude", -90.0, 90.0, 20.0, format="%.5f"
+            )
+            lon = st.number_input(
+                "Longitude", -180.0, 180.0, 78.0, format="%.5f"
+            )
+            selected_location = "Manually entered coordinates"
 
-    weather_mode = st.radio(
-        "Weather data source",
-        ["Fetch weather automatically", "Enter weather manually"]
-    )
+        else:
+            st.info(
+                "Image GPS is available when the uploaded image contains "
+                "readable GPS metadata. Use AI Detection to inspect an image."
+            )
 
-    if weather_mode == "Fetch weather automatically":
-        if st.button("Fetch Current Weather"):
+        if st.button("Fetch Current Weather", type="primary"):
             if lat is None or lon is None:
-                st.warning("Select a valid location first.")
+                st.warning("Select a location first.")
             else:
                 try:
                     weather = get_weather(lat, lon)
                     st.session_state["weather"] = weather
-                    st.session_state["weather_location"] = (
-                        selected_location or f"{lat}, {lon}"
-                    )
                     st.session_state["weather_coords"] = (lat, lon)
+                    st.session_state["weather_location"] = selected_location
                 except (requests.RequestException, KeyError, ValueError) as error:
                     st.error(f"Could not retrieve weather: {error}")
 
         weather = st.session_state.get("weather")
         saved_coords = st.session_state.get("weather_coords")
-        current_coords = (lat, lon) if lat is not None and lon is not None else None
+        current_coords = (
+            (lat, lon) if lat is not None and lon is not None else None
+        )
 
-        if weather and saved_coords == current_coords:
+        if weather and saved_coords == current_coords and current_coords:
             st.success(
                 f"Weather for {st.session_state.get('weather_location', 'selected location')}"
             )
             st.caption(
-                f"Observation/model time: {weather['time']} "
+                f"Weather time: {weather['time']} "
                 f"({weather['timezone']})"
             )
 
             a, b = st.columns(2)
             a.metric("Temperature", f"{weather['temperature']} °C")
             b.metric("Humidity", f"{weather['humidity']}%")
-            a.metric("Wind speed", f"{weather['wind']} km/h")
-            b.metric("Current-hour precipitation", f"{weather['rain_now']} mm")
-            st.metric("Precipitation in returned 24-hour window", f"{weather['rain_24h']:.1f} mm")
+            a.metric("Wind Speed", f"{weather['wind']} km/h")
+            b.metric(
+                "Current Precipitation",
+                f"{weather['rain_now']} mm",
+            )
+            st.metric(
+                "Precipitation in returned window",
+                f"{weather['rain_24h']:.1f} mm",
+            )
 
-            if st.button("Calculate Risk From Weather"):
+            if st.button("Calculate Experimental Risk"):
                 score, category = calculate_risk(
                     weather["temperature"],
                     weather["humidity"],
                     weather["rain_24h"],
-                    weather["wind"]
+                    weather["wind"],
                 )
-                st.metric("Experimental risk score", f"{score:.1f}/100")
+                st.metric("Experimental score", f"{score:.1f}/100")
                 st.progress(int(score))
                 st.write(f"**Prototype category:** {category} risk")
 
@@ -358,25 +499,48 @@ with right:
         )
         humidity = st.slider("Relative humidity (%)", 0, 100, 30)
         rainfall = st.number_input(
-            "Rainfall in last 24 hours (mm)",
-            0.0, 500.0, 0.0
+            "Rainfall in last 24 hours (mm)", 0.0, 500.0, 0.0
         )
         wind = st.number_input(
             "Wind speed (km/h)", 0.0, 200.0, 20.0
         )
 
-        if st.button("Calculate Manual Risk"):
+        if st.button("Calculate Experimental Risk", type="primary"):
             score, category = calculate_risk(
                 temperature, humidity, rainfall, wind
             )
-            st.metric("Experimental risk score", f"{score:.1f}/100")
+            st.metric("Experimental score", f"{score:.1f}/100")
             st.progress(int(score))
             st.write(f"**Prototype category:** {category} risk")
 
+
+elif page == "Incident Map":
+    st.subheader("Wildfire Incident Map")
+    st.info(
+        "Map integration is the next development stage. This page does "
+        "not yet display verified live wildfire incidents."
+    )
+    st.write(
+        "We will connect this page to the incident database, then plot "
+        "geolocated records with clearly identified sample or real-data sources."
+    )
+
+
+elif page == "Incident History":
+    st.subheader("Incident History")
+    st.info(
+        "Persistent incident history is not connected yet. We will add "
+        "a SQLite database so records remain available between sessions."
+    )
+    st.write(
+        "Planned fields include timestamp, image, detected classes, "
+        "confidence, location, weather, risk estimate and incident status."
+    )
+
+
 st.divider()
 st.caption(
-    "Academic prototype only. Weather values are model-based estimates "
-    "and may not represent conditions at the exact forest location. "
-    "The risk formula is illustrative and not scientifically validated. "
-    "Do not use it for emergency decisions."
+    "FireGridNet is an academic prototype. AI detections can be wrong, "
+    "the weather-based score is not scientifically validated, and this "
+    "application is not an official wildfire warning system."
 )
