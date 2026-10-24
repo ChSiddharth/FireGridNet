@@ -354,7 +354,7 @@ elif page == "AI Detection":
                         f"{len(result.boxes)} possible object(s) detected."
                     )
 
-detections = []
+                detections = []
 
 for box in result.boxes:
     class_id = int(box.cls[0].item())
