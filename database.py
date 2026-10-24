@@ -86,3 +86,18 @@ def get_incidents(limit=500):
         """, (limit,)).fetchall()
 
         return [dict(row) for row in rows]
+def update_incident_status(incident_id, status):
+    allowed_statuses = ["New", "Under Review", "Resolved"]
+
+    if status not in allowed_statuses:
+        raise ValueError("Invalid incident status")
+
+    with get_connection() as connection:
+        connection.execute(
+            """
+            UPDATE incidents
+            SET status = ?
+            WHERE id = ?
+            """,
+            (status, incident_id),
+        )
