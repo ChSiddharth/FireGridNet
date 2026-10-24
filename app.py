@@ -721,15 +721,16 @@ elif page == "Incident History":
             )
 
             rows.append({
-    "Incident ID": incident["id"],
-    "Timestamp (UTC)": incident["timestamp"],
-    "Image": incident["image_name"] or "Unknown",
-    "Record Type": (
+                "Incident ID": incident["id"],
+                "Timestamp (UTC)": incident["timestamp"],
+                "Image": incident["image_name"] or "Unknown",
+                "Record Type": (
         "Weather Risk Assessment"
         if incident["image_name"] == "Weather Risk Assessment"
         else "AI Detection"
     ),
     "Objects Detected": incident["detection_count"],
+                "Objects Detected": incident["detection_count"],
         st.dataframe(
             rows,
             use_container_width=True,
