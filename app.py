@@ -299,10 +299,63 @@ elif page == "AI Detection":
         key="detection_upload",
     )
 
+
     if uploaded_image is not None:
         image = Image.open(uploaded_image)
         image_gps = get_image_gps(image)
         image = image.convert("RGB")
+
+        st.markdown("### 📍 Observation Location")
+
+        location_choice = st.radio(
+            "How would you like to set the location?",
+            ["Enter coordinates", "Use image GPS"],
+            horizontal=True,
+            key="detection_location_choice",
+        )
+
+        observation_lat = None
+        observation_lon = None
+        location_source = None
+
+        if location_choice == "Enter coordinates":
+            col_lat, col_lon = st.columns(2)
+
+            with col_lat:
+                observation_lat = st.number_input(
+                    "Latitude",
+                    min_value=-90.0,
+                    max_value=90.0,
+                    value=17.3850,
+                    format="%.5f",
+                    key="detection_latitude",
+                )
+
+            with col_lon:
+                observation_lon = st.number_input(
+                    "Longitude",
+                    min_value=-180.0,
+                    max_value=180.0,
+                    value=78.4867,
+                    format="%.5f",
+                    key="detection_longitude",
+                )
+
+            location_source = "Manually entered coordinates"
+
+        elif image_gps:
+            observation_lat, observation_lon = image_gps
+            location_source = "Image EXIF GPS"
+
+            st.success(
+                f"Using image GPS: {observation_lat:.5f}, "
+                f"{observation_lon:.5f}"
+            )
+        else:
+            st.warning(
+                "This image has no readable GPS metadata. "
+                "Choose Enter coordinates to assign a location."
+            )
 
         st.image(
             image,
@@ -310,15 +363,6 @@ elif page == "AI Detection":
             use_container_width=True,
         )
 
-        if image_gps:
-            st.success(
-                f"Image GPS: {image_gps[0]:.5f}, "
-                f"{image_gps[1]:.5f}"
-            )
-        else:
-            st.caption(
-                "No readable GPS coordinates found in image metadata."
-            )
 
 
     if st.button("Run AI Analysis", type="primary"):
@@ -368,11 +412,9 @@ elif page == "AI Detection":
                 database.save_incident(
                     image_name=uploaded_image.name,
                     detections=detections,
-                    latitude=image_gps[0] if image_gps else None,
-                    longitude=image_gps[1] if image_gps else None,
-                    location_source=(
-                        "Image EXIF GPS" if image_gps else None
-                    ),
+                    latitude=observation_lat,
+                    longitude=observation_lon,
+                    location_source=location_source,
                 )
 
                 st.success(
