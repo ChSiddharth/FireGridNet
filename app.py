@@ -1,4 +1,5 @@
 import os
+import json
 import tempfile
 import database
 import requests
@@ -546,21 +547,59 @@ elif page == "Incident Map":
     )
 
 
+
 elif page == "Incident History":
     st.subheader("Incident History")
-    st.info(
-        "Persistent incident history is not connected yet. We will add "
-        "a SQLite database so records remain available between sessions."
-    )
     st.write(
-        "Planned fields include timestamp, image, detected classes, "
-        "confidence, location, weather, risk estimate and incident status."
+        "Review fire and smoke detections saved by FireGridNet."
     )
 
+    incidents = database.get_incidents()
 
-st.divider()
-st.caption(
-    "FireGridNet is an academic prototype. AI detections can be wrong, "
-    "the weather-based score is not scientifically validated, and this "
-    "application is not an official wildfire warning system."
-)
+    if not incidents:
+        st.info(
+            "No incidents saved yet. Go to AI Detection, "
+            "upload an image, and run AI Analysis."
+        )
+    else:
+        st.metric("Saved Incidents", len(incidents))
+
+        rows = []
+
+        for incident in incidents:
+            detections = json.loads(
+                incident["detections_json"] or "[]"
+            )
+
+            detection_summary = ", ".join(
+                f'{item["class"].title()} '
+                f'({item["confidence"]:.1%})'
+                for item in detections
+            )
+
+            rows.append({
+                "Incident ID": incident["id"],
+                "Timestamp (UTC)": incident["timestamp"],
+                "Image": incident["image_name"] or "Unknown",
+                "Objects Detected": incident["detection_count"],
+                "Detection Details": detection_summary or "None",
+                "Latitude": incident["latitude"],
+                "Longitude": incident["longitude"],
+                "Status": incident["status"],
+            })
+
+        st.dataframe(
+            rows,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.caption(
+            "These are AI-generated detections, not confirmed "
+            "wildfire incidents. Location is shown only when "
+            "GPS metadata was available."
+        )
+
+    if st.button("Refresh Incident History"):
+        st.rerun()
+
