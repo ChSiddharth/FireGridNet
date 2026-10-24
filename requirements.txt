@@ -3,3 +3,4 @@ ultralytics
 Pillow
 opencv-python-headless
 requests
+pandas
