@@ -536,15 +536,76 @@ elif page == "Risk Assessment":
             st.write(f"**Prototype category:** {category} risk")
 
 
+
 elif page == "Incident Map":
-    st.subheader("Wildfire Incident Map")
-    st.info(
-        "Map integration is the next development stage. This page does "
-        "not yet display verified live wildfire incidents."
-    )
+    st.subheader("Wildfire Observation Map")
     st.write(
-        "We will connect this page to the incident database, then plot "
-        "geolocated records with clearly identified sample or real-data sources."
+        "Explore saved AI detections with available image GPS coordinates."
+    )
+
+    incidents = database.get_incidents()
+
+    mapped_incidents = [
+        incident
+        for incident in incidents
+        if incident["latitude"] is not None
+        and incident["longitude"] is not None
+    ]
+
+    col1, col2 = st.columns(2)
+    col1.metric("Saved Observations", len(incidents))
+    col2.metric("Observations with GPS", len(mapped_incidents))
+
+    if mapped_incidents:
+        map_rows = []
+
+        for incident in mapped_incidents:
+            map_rows.append({
+                "latitude": float(incident["latitude"]),
+                "longitude": float(incident["longitude"]),
+            })
+
+        st.map(
+            pd.DataFrame(map_rows),
+            latitude="latitude",
+            longitude="longitude",
+            use_container_width=True,
+        )
+
+        st.subheader("Mapped Observations")
+
+        for incident in mapped_incidents:
+            with st.expander(
+                f"Observation #{incident['id']} — "
+                f"{incident['image_name'] or 'Uploaded image'}"
+            ):
+                st.write(
+                    f"**Recorded:** {incident['timestamp']}"
+                )
+                st.write(
+                    f"**Detected objects:** {incident['detection_count']}"
+                )
+                st.write(
+                    f"**Latitude:** {incident['latitude']}"
+                )
+                st.write(
+                    f"**Longitude:** {incident['longitude']}"
+                )
+                st.caption(
+                    "This is an AI-generated observation, not a "
+                    "confirmed wildfire report."
+                )
+    else:
+        st.info(
+            "No saved observations have GPS coordinates yet. "
+            "Try an image containing readable GPS metadata, then "
+            "run AI Analysis."
+        )
+
+    st.caption(
+        "Only observations with GPS coordinates are plotted. "
+        "Images without location metadata are not assigned "
+        "an estimated location."
     )
 
 
