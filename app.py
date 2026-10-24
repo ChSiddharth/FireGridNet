@@ -354,16 +354,32 @@ elif page == "AI Detection":
                         f"{len(result.boxes)} possible object(s) detected."
                     )
 
-                    for box in result.boxes:
-                        class_id = int(box.cls[0].item())
-                        confidence = float(box.conf[0].item())
-                        class_name = model.names[class_id]
+detections = []
 
-                        st.write(
-                            f"**{class_name.title()}** — "
-                            f"{confidence:.1%} confidence"
-                        )
+for box in result.boxes:
+    class_id = int(box.cls[0].item())
+    confidence = float(box.conf[0].item())
+    class_name = model.names[class_id]
 
+    detections.append({
+        "class": class_name,
+        "confidence": round(confidence, 4)
+    })
+
+    st.write(
+        f"**{class_name.title()}** — "
+        f"{confidence:.1%} confidence"
+    )
+
+database.save_incident(
+    image_name=uploaded_image.name,
+    detections=detections,
+    latitude=image_gps[0] if image_gps else None,
+    longitude=image_gps[1] if image_gps else None,
+    location_source="Image EXIF GPS" if image_gps else None,
+)
+
+st.success("Detection results saved to incident history.")
             except Exception as error:
                 st.error(f"Image analysis failed: {error}")
             finally:
