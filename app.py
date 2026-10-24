@@ -318,73 +318,78 @@ elif page == "AI Detection":
                 "No readable GPS coordinates found in image metadata."
             )
 
-        if st.button("Run AI Analysis", type="primary"):
-            temp_path = None
-            try:
-                with tempfile.NamedTemporaryFile(
-                    suffix=".jpg", delete=False
-                ) as temp:
-                    image.save(temp.name)
-                    temp_path = temp.name
 
-                with st.spinner("Analysing image with YOLO..."):
-                    model = load_model()
-                    result = model.predict(
-                        source=temp_path,
-                        conf=0.25,
-                        verbose=False,
-                    )[0]
+    if st.button("Run AI Analysis", type="primary"):
+        temp_path = None
 
-                plotted = result.plot()[:, :, ::-1]
-                st.subheader("Detection Results")
-                st.image(
-                    plotted,
-                    caption="AI predictions",
-                    use_container_width=True,
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=".jpg", delete=False
+            ) as temp:
+                image.save(temp.name)
+                temp_path = temp.name
+
+            with st.spinner("Analysing image with YOLO..."):
+                model = load_model()
+                result = model.predict(
+                    source=temp_path,
+                    conf=0.25,
+                    verbose=False,
+                )[0]
+
+            plotted = result.plot()[:, :, ::-1]
+            st.subheader("Detection Results")
+            st.image(
+                plotted,
+                caption="AI predictions",
+                use_container_width=True,
+            )
+
+            detections = []
+
+            for box in result.boxes:
+                class_id = int(box.cls[0].item())
+                confidence = float(box.conf[0].item())
+                class_name = model.names[class_id]
+
+                detections.append({
+                    "class": class_name,
+                    "confidence": round(confidence, 4),
+                })
+
+                st.write(
+                    f"**{class_name.title()}** — "
+                    f"{confidence:.1%} confidence"
                 )
 
-                if len(result.boxes) == 0:
-                    st.warning(
-                        "No fire or smoke detected above the current "
-                        "confidence threshold. This does not prove "
-                        "that the area is safe."
-                    )
-                else:
-                    st.success(
-                        f"{len(result.boxes)} possible object(s) detected."
-                    )
+            if detections:
+                database.save_incident(
+                    image_name=uploaded_image.name,
+                    detections=detections,
+                    latitude=image_gps[0] if image_gps else None,
+                    longitude=image_gps[1] if image_gps else None,
+                    location_source=(
+                        "Image EXIF GPS" if image_gps else None
+                    ),
+                )
 
-                detections = []
+                st.success(
+                    "Detection results saved to incident history."
+                )
+            else:
+                st.warning(
+                    "No fire or smoke detected above the current "
+                    "confidence threshold. This does not prove "
+                    "that the area is safe. No incident was saved."
+                )
 
-for box in result.boxes:
-    class_id = int(box.cls[0].item())
-    confidence = float(box.conf[0].item())
-    class_name = model.names[class_id]
+        except Exception as error:
+            st.error(f"Image analysis failed: {error}")
 
-    detections.append({
-        "class": class_name,
-        "confidence": round(confidence, 4)
-    })
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
 
-    st.write(
-        f"**{class_name.title()}** — "
-        f"{confidence:.1%} confidence"
-    )
-
-database.save_incident(
-    image_name=uploaded_image.name,
-    detections=detections,
-    latitude=image_gps[0] if image_gps else None,
-    longitude=image_gps[1] if image_gps else None,
-    location_source="Image EXIF GPS" if image_gps else None,
-)
-
-st.success("Detection results saved to incident history.")
-            except Exception as error:
-                st.error(f"Image analysis failed: {error}")
-            finally:
-                if temp_path and os.path.exists(temp_path):
-                    os.remove(temp_path)
 
 
 elif page == "Risk Assessment":
