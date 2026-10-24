@@ -671,6 +671,7 @@ elif page == "Incident Map":
 
 
 
+
 elif page == "Incident History":
     st.subheader("Incident History")
     st.write(
@@ -722,7 +723,8 @@ elif page == "Incident History":
             "wildfire incidents. Location is shown only when "
             "GPS metadata was available."
         )
-                st.subheader("Update Incident Status")
+
+        st.subheader("Update Incident Status")
 
         incident_options = {
             f"Incident #{incident['id']} — "
@@ -746,7 +748,6 @@ elif page == "Incident History":
         )
 
         status_options = ["New", "Under Review", "Resolved"]
-
         current_status = selected_incident["status"]
 
         if current_status not in status_options:
@@ -768,4 +769,3 @@ elif page == "Incident History":
 
     if st.button("Refresh Incident History"):
         st.rerun()
-
