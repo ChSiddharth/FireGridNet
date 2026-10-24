@@ -722,6 +722,49 @@ elif page == "Incident History":
             "wildfire incidents. Location is shown only when "
             "GPS metadata was available."
         )
+                st.subheader("Update Incident Status")
+
+        incident_options = {
+            f"Incident #{incident['id']} — "
+            f"{incident['image_name'] or 'Uploaded image'}": incident["id"]
+            for incident in incidents
+        }
+
+        selected_incident_label = st.selectbox(
+            "Select an incident",
+            options=list(incident_options.keys()),
+        )
+
+        selected_incident_id = incident_options[
+            selected_incident_label
+        ]
+
+        selected_incident = next(
+            incident
+            for incident in incidents
+            if incident["id"] == selected_incident_id
+        )
+
+        status_options = ["New", "Under Review", "Resolved"]
+
+        current_status = selected_incident["status"]
+
+        if current_status not in status_options:
+            current_status = "New"
+
+        new_status = st.selectbox(
+            "Choose status",
+            options=status_options,
+            index=status_options.index(current_status),
+        )
+
+        if st.button("Save Status", type="primary"):
+            database.update_incident_status(
+                selected_incident_id,
+                new_status,
+            )
+            st.success("Incident status updated.")
+            st.rerun()
 
     if st.button("Refresh Incident History"):
         st.rerun()
