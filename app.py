@@ -744,10 +744,11 @@ elif page == "Incident History":
                 "Image": incident["image_name"] or "Unknown",
                 "Record Type": (
                     "Weather Risk Assessment"
-                    if incident["image_name"]
-                    == "Weather Risk Assessment"
-                    else "AI Detection"
-                ),
+                     if incident["image_name"] == "Weather Risk Assessment"
+                     else "Manual Risk Assessment"
+                     if incident["image_name"] == "Manual Risk Assessment"
+                     else "AI Detection"
+            ),
                 "Objects Detected": incident["detection_count"],
                 "Detection Details": detection_summary or "None",
                 "Latitude": incident["latitude"],
