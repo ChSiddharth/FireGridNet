@@ -588,13 +588,30 @@ elif page == "Risk Assessment":
             "Wind speed (km/h)", 0.0, 200.0, 20.0
         )
 
+        
         if st.button("Calculate Experimental Risk", type="primary"):
             score, category = calculate_risk(
                 temperature, humidity, rainfall, wind
             )
+
             st.metric("Experimental score", f"{score:.1f}/100")
             st.progress(int(score))
             st.write(f"**Prototype category:** {category} risk")
+
+            database.save_incident(
+                image_name="Manual Risk Assessment",
+                detections=[],
+                location_source="Manual weather inputs",
+                temperature=temperature,
+                humidity=humidity,
+                wind_speed=wind,
+                rainfall_24h=rainfall,
+                risk_score=score,
+                risk_category=category,
+            )
+
+            st.success("Manual risk assessment saved to incident history.")
+
 
 
 
