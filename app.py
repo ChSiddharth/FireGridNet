@@ -737,110 +737,54 @@ elif page == "Incident Map":
 
 
 
-elif page == "Incident History":
-    st.subheader("Incident History")
-    st.write(
-        "Review fire and smoke detections saved by FireGridNet."
-    )
 
-    incidents = database.get_incidents()
+        df = pd.DataFrame(rows)
 
-    if not incidents:
-        st.info(
-            "No incidents saved yet. Go to AI Detection, "
-            "upload an image, and run AI Analysis."
+        st.subheader("Filter Incidents")
+
+        filter_col1, filter_col2 = st.columns(2)
+
+        with filter_col1:
+            record_filter = st.selectbox(
+                "Record Type",
+                [
+                    "All Types",
+                    "AI Detection",
+                    "Weather Risk Assessment",
+                    "Manual Risk Assessment",
+                ],
+            )
+
+        with filter_col2:
+            status_filter = st.selectbox(
+                "Status",
+                [
+                    "All Statuses",
+                    "New",
+                    "Under Review",
+                    "Resolved",
+                ],
+            )
+
+        filtered_df = df.copy()
+
+        if record_filter != "All Types":
+            filtered_df = filtered_df[
+                filtered_df["Record Type"] == record_filter
+            ]
+
+        if status_filter != "All Statuses":
+            filtered_df = filtered_df[
+                filtered_df["Status"] == status_filter
+            ]
+
+        st.caption(
+            f"Showing {len(filtered_df)} of {len(df)} incidents"
         )
-    else:
-        st.metric("Saved Incidents", len(incidents))
-
-        rows = []
-
-        for incident in incidents:
-            detections = json.loads(
-                incident["detections_json"] or "[]"
-            )
-
-            detection_summary = ", ".join(
-                f'{item["class"].title()} '
-                f'({item["confidence"]:.1%})'
-                for item in detections
-            )
-
-            rows.append({
-                "Incident ID": incident["id"],
-                "Timestamp (UTC)": incident["timestamp"],
-                "Image": incident["image_name"] or "Unknown",
-                "Record Type": (
-                    "Weather Risk Assessment"
-                     if incident["image_name"] == "Weather Risk Assessment"
-                     else "Manual Risk Assessment"
-                     if incident["image_name"] == "Manual Risk Assessment"
-                     else "AI Detection"
-            ),
-                "Objects Detected": incident["detection_count"],
-                "Detection Details": detection_summary or "None",
-                "Latitude": incident["latitude"],
-                "Longitude": incident["longitude"],
-                "Status": incident["status"],
-                "Risk Score": incident["risk_score"],
-                "Risk Category": incident["risk_category"],
-            })
 
         st.dataframe(
-            rows,
+            filtered_df,
             use_container_width=True,
             hide_index=True,
         )
-
-        st.caption(
-            "AI detections and weather risk estimates are "
-            "different record types. Neither alone confirms "
-            "an actual wildfire."
-        )
-
-        st.subheader("Update Incident Status")
-
-        incident_options = {
-            f"Incident #{incident['id']} — "
-            f"{incident['image_name'] or 'Uploaded image'}": incident["id"]
-            for incident in incidents
-        }
-
-        selected_incident_label = st.selectbox(
-            "Select an incident",
-            options=list(incident_options.keys()),
-        )
-
-        selected_incident_id = incident_options[
-            selected_incident_label
-        ]
-
-        selected_incident = next(
-            incident
-            for incident in incidents
-            if incident["id"] == selected_incident_id
-        )
-
-        status_options = ["New", "Under Review", "Resolved"]
-        current_status = selected_incident["status"]
-
-        if current_status not in status_options:
-            current_status = "New"
-
-        new_status = st.selectbox(
-            "Choose status",
-            options=status_options,
-            index=status_options.index(current_status),
-        )
-
-        if st.button("Save Status", type="primary"):
-            database.update_incident_status(
-                selected_incident_id,
-                new_status,
-            )
-            st.success("Incident status updated.")
-            st.rerun()
-
-    if st.button("Refresh Incident History"):
-        st.rerun()
 
