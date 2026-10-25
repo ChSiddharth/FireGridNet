@@ -738,7 +738,7 @@ elif page == "Incident Map":
 
 
 
-    elif page == "Incident History":
+elif page == "Incident History":
     st.subheader("Incident History")
     st.write(
         "Review fire and smoke detections saved by FireGridNet."
