@@ -738,6 +738,56 @@ elif page == "Incident Map":
 
 
 
+    elif page == "Incident History":
+    st.subheader("Incident History")
+    st.write(
+        "Review fire and smoke detections saved by FireGridNet."
+    )
+
+    incidents = database.get_incidents()
+
+    if not incidents:
+        st.info(
+            "No incidents saved yet. Go to AI Detection, "
+            "upload an image, and run AI Analysis."
+        )
+    else:
+        st.metric("Saved Incidents", len(incidents))
+
+        rows = []
+
+        for incident in incidents:
+            detections = json.loads(
+                incident["detections_json"] or "[]"
+            )
+
+            detection_summary = ", ".join(
+                f'{item["class"].title()} '
+                f'({item["confidence"]:.1%})'
+                for item in detections
+            )
+
+            rows.append({
+                "Incident ID": incident["id"],
+                "Timestamp (UTC)": incident["timestamp"],
+                "Image": incident["image_name"] or "Unknown",
+                "Record Type": (
+                    "Weather Risk Assessment"
+                     if incident["image_name"] == "Weather Risk Assessment"
+                     else "Manual Risk Assessment"
+                     if incident["image_name"] == "Manual Risk Assessment"
+                     else "AI Detection"
+            ),
+                "Objects Detected": incident["detection_count"],
+                "Detection Details": detection_summary or "None",
+                "Latitude": incident["latitude"],
+                "Longitude": incident["longitude"],
+                "Status": incident["status"],
+                "Risk Score": incident["risk_score"],
+                "Risk Category": incident["risk_category"],
+            })
+
+        
         df = pd.DataFrame(rows)
 
         st.subheader("Filter Incidents")
@@ -788,3 +838,54 @@ elif page == "Incident Map":
             hide_index=True,
         )
 
+        st.caption(
+            "AI detections and weather risk estimates are "
+            "different record types. Neither alone confirms "
+            "an actual wildfire."
+        )
+
+        st.subheader("Update Incident Status")
+
+        incident_options = {
+            f"Incident #{incident['id']} — "
+            f"{incident['image_name'] or 'Uploaded image'}": incident["id"]
+            for incident in incidents
+        }
+
+        selected_incident_label = st.selectbox(
+            "Select an incident",
+            options=list(incident_options.keys()),
+        )
+
+        selected_incident_id = incident_options[
+            selected_incident_label
+        ]
+
+        selected_incident = next(
+            incident
+            for incident in incidents
+            if incident["id"] == selected_incident_id
+        )
+
+        status_options = ["New", "Under Review", "Resolved"]
+        current_status = selected_incident["status"]
+
+        if current_status not in status_options:
+            current_status = "New"
+
+        new_status = st.selectbox(
+            "Choose status",
+            options=status_options,
+            index=status_options.index(current_status),
+        )
+
+        if st.button("Save Status", type="primary"):
+            database.update_incident_status(
+                selected_incident_id,
+                new_status,
+            )
+            st.success("Incident status updated.")
+            st.rerun()
+
+    if st.button("Refresh Incident History"):
+        st.rerun()
