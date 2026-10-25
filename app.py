@@ -653,21 +653,49 @@ elif page == "Incident Map":
     col3.metric("Fire Detections", fire_count)
     col4.metric("Smoke Detections", smoke_count)
 
+    
     if mapped_incidents:
         map_rows = []
 
         for incident in mapped_incidents:
+            detections = json.loads(
+                incident["detections_json"] or "[]"
+            )
+
+            if incident["image_name"] == "Weather Risk Assessment":
+                record_type = "Weather Risk Assessment"
+            elif incident["image_name"] == "Manual Risk Assessment":
+                record_type = "Manual Risk Assessment"
+            else:
+                record_type = "AI Detection"
+
             map_rows.append({
                 "latitude": float(incident["latitude"]),
                 "longitude": float(incident["longitude"]),
+                "observation_id": incident["id"],
+                "record_type": record_type,
+                "image_name": incident["image_name"] or "Uploaded image",
+                "detected_objects": incident["detection_count"],
+                "risk_score": incident["risk_score"],
             })
 
+
+        
         st.map(
             pd.DataFrame(map_rows),
             latitude="latitude",
             longitude="longitude",
             use_container_width=True,
         )
+
+        st.subheader("Mapped Observations")
+
+        st.dataframe(
+            pd.DataFrame(map_rows),
+            use_container_width=True,
+            hide_index=True,
+        )
+
 
         st.subheader("Mapped Observations")
 
