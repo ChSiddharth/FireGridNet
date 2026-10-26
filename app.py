@@ -623,8 +623,54 @@ elif page == "Incident Map":
     st.write(
         "Explore saved AI detections with available image GPS coordinates."
     )
+        st.subheader("🌲 H3 Forest Grid")
+
+    geojson_path = "forest_grid_v4.geojson"
+
+    if os.path.exists(geojson_path):
+        with open(geojson_path, "r", encoding="utf-8") as file:
+            forest_data = json.load(file)
+
+        forest_map = folium.Map(
+            location=[35.0, 85.0],
+            zoom_start=5,
+            tiles="CartoDB dark_matter"
+        )
+
+        folium.GeoJson(
+            forest_data,
+            name="Forest Grid",
+            style_function=lambda feature: {
+                "fillColor": "#228B22",
+                "color": "#8BC34A",
+                "weight": 1,
+                "fillOpacity": 0.35,
+            },
+            tooltip=folium.GeoJsonTooltip(
+                fields=["cell_id", "forest_sample_points"],
+                aliases=["H3 Cell:", "Forest Sample Points:"],
+                localize=True,
+            ),
+        ).add_to(forest_map)
+
+        folium.LayerControl().add_to(forest_map)
+
+        st_folium(
+            forest_map,
+            use_container_width=True,
+            height=500,
+            key="forest_grid_map",
+        )
+
+        st.caption(
+            "Green polygons show H3 grid cells. "
+            "Forest sample counts are not exact forest-coverage percentages."
+        )
+    else:
+        st.warning("Forest grid file not found: forest_grid_v4.geojson")
     
     incidents = database.get_incidents()
+    
 
     mapped_incidents = [
         incident
