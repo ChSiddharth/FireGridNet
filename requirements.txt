@@ -5,3 +5,5 @@ opencv-python-headless
 requests
 pandas
 h3
+rasterio
+shapely
