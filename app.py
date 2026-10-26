@@ -192,6 +192,48 @@ def calculate_risk(temperature, humidity, rainfall, wind):
     return score, category
 
 
+def risk_color(score):
+    if score < 30:
+        return "#2EAD66"
+    if score < 60:
+        return "#F2B705"
+    return "#E34B4B"
+
+
+def show_risk_breakdown(temperature, humidity, rainfall, wind, score, category):
+    temp_part = 0.35 * max(0, min(100, temperature / 60 * 100))
+    humidity_part = 0.30 * (100 - humidity)
+    wind_part = 0.20 * (min(wind, 100) / 100 * 100)
+    rain_part = 0.15 * (100 - min(rainfall, 50) / 50 * 100)
+    st.subheader("Risk Score Breakdown")
+    st.caption(
+        "Contributions from the prototype formula, not a trained or "
+        "operationally validated wildfire prediction model."
+    )
+    breakdown = pd.DataFrame({
+        "Weather factor": ["Temperature", "Low humidity", "Wind speed", "Low rainfall"],
+        "Score contribution": [temp_part, humidity_part, wind_part, rain_part],
+    }).set_index("Weather factor")
+    st.bar_chart(breakdown)
+    st.progress(int(score))
+    st.metric("Experimental risk score", f"{score:.1f}/100", category)
+    if category == "Higher":
+        st.error("HIGHER-RISK SCENARIO: verify conditions with official local sources.")
+    elif category == "Moderate":
+        st.warning("MODERATE-RISK SCENARIO: continue monitoring weather and local reports.")
+    else:
+        st.success("LOWER-RISK SCENARIO: this estimate does not prove an area is safe.")
+
+
+def get_record_type(incident):
+    name = incident.get("image_name") or ""
+    if name == "Weather Risk Assessment":
+        return "Weather Risk Assessment"
+    if name == "Manual Risk Assessment":
+        return "Manual Risk Assessment"
+    return "AI Detection"
+
+
 # Sidebar navigation
 with st.sidebar:
     st.markdown("# 🔥 FireGridNet")
@@ -267,8 +309,8 @@ if page == "Overview":
     with right:
         st.markdown("### 🗺️ Incident Geography")
         st.write(
-            "The interactive incident map will be connected to "
-            "saved incident records in a later development stage."
+            "Explore the H3 forest grid, saved observation markers, "
+            "and a clearly labelled prototype risk overlay."
         )
         if st.button("Open Incident Map", use_container_width=True):
             st.session_state["navigation_target"] = "Incident Map"
@@ -276,17 +318,38 @@ if page == "Overview":
 
         st.markdown("### 📋 Incident Records")
         st.write(
-            "A persistent incident database and history dashboard "
-            "will be implemented in a later stage."
+            "Review saved AI detections and weather assessments, "
+            "filter records, and update their review status."
         )
         if st.button("Open Incident History", use_container_width=True):
             st.session_state["navigation_target"] = "Incident History"
             st.rerun()
 
-    st.info(
-        "No live incident feed is connected yet. This overview "
-        "does not represent confirmed active wildfires."
-    )
+    st.divider()
+    st.subheader("🚨 Monitoring Alerts")
+    saved_incidents = database.get_incidents()
+    high_risk_records = [
+        item for item in saved_incidents
+        if item.get("risk_score") is not None and float(item["risk_score"]) >= 60
+    ]
+    unreviewed_detections = []
+    for item in saved_incidents:
+        try:
+            objects = json.loads(item.get("detections_json") or "[]")
+        except (TypeError, json.JSONDecodeError):
+            objects = []
+        if objects and item.get("status", "New") == "New":
+            unreviewed_detections.append(item)
+    alert_a, alert_b = st.columns(2)
+    alert_a.metric("Higher-risk assessments", len(high_risk_records))
+    alert_b.metric("New AI detection records", len(unreviewed_detections))
+    if high_risk_records:
+        st.warning("Review higher-risk weather assessments in Incident History. These are experimental estimates.")
+    if unreviewed_detections:
+        st.info("New AI detection records need review; detections are not confirmed wildfire reports.")
+    if not high_risk_records and not unreviewed_detections:
+        st.success("No saved prototype alerts currently meet these rules.")
+    st.caption("Alerts use saved app records only; no emergency service or live wildfire feed is connected.")
 
 
 elif page == "AI Detection":
@@ -557,9 +620,18 @@ elif page == "Risk Assessment":
                     weather["wind"],
                 )
 
-                st.metric("Experimental score", f"{score:.1f}/100")
-                st.progress(int(score))
-                st.write(f"**Prototype category:** {category} risk")
+                st.session_state["latest_risk_score"] = score
+                st.session_state["latest_risk_category"] = category
+                st.session_state["latest_risk_weather"] = {
+                    "temperature": weather["temperature"],
+                    "humidity": weather["humidity"],
+                    "rainfall": weather["rain_24h"],
+                    "wind": weather["wind"],
+                }
+                show_risk_breakdown(
+                    weather["temperature"], weather["humidity"],
+                    weather["rain_24h"], weather["wind"], score, category
+                )
 
                 database.save_incident(
                     image_name="Weather Risk Assessment",
@@ -596,9 +668,17 @@ elif page == "Risk Assessment":
                 temperature, humidity, rainfall, wind
             )
 
-            st.metric("Experimental score", f"{score:.1f}/100")
-            st.progress(int(score))
-            st.write(f"**Prototype category:** {category} risk")
+            st.session_state["latest_risk_score"] = score
+            st.session_state["latest_risk_category"] = category
+            st.session_state["latest_risk_weather"] = {
+                "temperature": temperature,
+                "humidity": humidity,
+                "rainfall": rainfall,
+                "wind": wind,
+            }
+            show_risk_breakdown(
+                temperature, humidity, rainfall, wind, score, category
+            )
 
             database.save_incident(
                 image_name="Manual Risk Assessment",
@@ -619,172 +699,182 @@ elif page == "Risk Assessment":
 
     st.subheader("Wildfire Observation Map")
 elif page == "Incident Map":
-    st.subheader("Wildfire Observation Map")
+    st.subheader("🗺️ GIS Incident & Grid Risk Map")
     st.write(
-        "Explore saved AI detections with available image GPS coordinates."
+        "Explore the H3 forest grid and saved observations. The risk overlay "
+        "uses the latest experimental weather score as a scenario for every cell; "
+        "it is not a separate prediction for each cell."
     )
 
-    st.subheader("🌲 H3 Forest Grid")
-
-    geojson_path = "forest_grid_v4.geojson"
-
-    if os.path.exists(geojson_path):
-        with open(geojson_path, "r", encoding="utf-8") as file:
-            forest_data = json.load(file)
-
-        forest_map = folium.Map(
-            location=[35.0, 85.0],
-            zoom_start=5,
-            tiles="OpenStreetMap"
-        )
-
-        folium.GeoJson(
-            forest_data,
-            name="Forest Grid",
-            style_function=lambda feature: {
-                "fillColor": "#228B22",
-                "color": "#8BC34A",
-                "weight": 1,
-                "fillOpacity": 0.35,
-            },
-            tooltip=folium.GeoJsonTooltip(
-                fields=["cell_id", "forest_sample_points"],
-                aliases=["H3 Cell:", "Forest Sample Points:"],
-                localize=True,
-            ),
-        ).add_to(forest_map)
-
-        folium.LayerControl().add_to(forest_map)
-
-        st_folium(
-            forest_map,
-            use_container_width=True,
-            height=500,
-            key="forest_grid_map",
-        )
-
-        st.caption(
-            "Green polygons show H3 grid cells. "
-            "Forest sample counts are not exact forest-coverage percentages."
-        )
-    else:
-        st.warning("Forest grid file not found: forest_grid_v4.geojson")
-    
     incidents = database.get_incidents()
-    
-
     mapped_incidents = [
-        incident
-        for incident in incidents
-        if incident["latitude"] is not None
-        and incident["longitude"] is not None
+        incident for incident in incidents
+        if incident.get("latitude") is not None
+        and incident.get("longitude") is not None
     ]
 
-    fire_count = 0
-    smoke_count = 0
-
-    for incident in incidents:
-        detections = json.loads(
-            incident["detections_json"] or "[]"
+    latest_score = st.session_state.get("latest_risk_score")
+    latest_category = st.session_state.get("latest_risk_category", "Not calculated")
+    st.subheader("Grid-Based Risk Scenario")
+    if latest_score is None:
+        st.info(
+            "Calculate a weather risk on the Risk Assessment page first. "
+            "Until then, the grid shows forest cells without a risk classification."
         )
+        grid_score = None
+    else:
+        st.metric("Latest scenario score", f"{latest_score:.1f}/100", latest_category)
+        st.caption(
+            "Prototype limitation: this score is applied uniformly to the displayed "
+            "forest grid. Per-cell weather retrieval and a trained local model are future work."
+        )
+        grid_score = float(latest_score)
 
-        for detection in detections:
-            class_name = detection.get("class", "").lower()
+    geojson_path = "forest_grid_v4.geojson"
+    if os.path.exists(geojson_path):
+        try:
+            with open(geojson_path, "r", encoding="utf-8") as file:
+                forest_data = json.load(file)
 
-            if "fire" in class_name:
-                fire_count += 1
-            elif "smoke" in class_name:
-                smoke_count += 1
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Saved Observations", len(incidents))
-    col2.metric("Observations with GPS", len(mapped_incidents))
-    col3.metric("Fire Detections", fire_count)
-    col4.metric("Smoke Detections", smoke_count)
-
-    
-    if mapped_incidents:
-        map_rows = []
-
-        for incident in mapped_incidents:
-            detections = json.loads(
-                incident["detections_json"] or "[]"
+            forest_map = folium.Map(
+                location=[35.0, 85.0], zoom_start=5,
+                tiles="OpenStreetMap", control_scale=True,
             )
 
-            if incident["image_name"] == "Weather Risk Assessment":
-                record_type = "Weather Risk Assessment"
-            elif incident["image_name"] == "Manual Risk Assessment":
-                record_type = "Manual Risk Assessment"
+            def grid_style(feature):
+                fill = "#228B22" if grid_score is None else risk_color(grid_score)
+                return {
+                    "fillColor": fill, "color": "#E7E7E7",
+                    "weight": 1, "fillOpacity": 0.42 if grid_score is None else 0.55,
+                }
+
+            first_feature = (forest_data.get("features") or [{}])[0]
+            tooltip_fields = [
+                field for field in ("cell_id", "forest_sample_points")
+                if field in first_feature.get("properties", {})
+            ]
+            geojson_kwargs = {
+                "data": forest_data,
+                "name": "Forest grid / risk scenario",
+                "style_function": grid_style,
+            }
+            if tooltip_fields:
+                geojson_kwargs["tooltip"] = folium.GeoJsonTooltip(
+                    fields=tooltip_fields,
+                    aliases=[
+                        "H3 Cell:" if field == "cell_id" else "Forest Sample Points:"
+                        for field in tooltip_fields
+                    ],
+                    localize=True,
+                )
+            folium.GeoJson(**geojson_kwargs).add_to(forest_map)
+
+            for incident in mapped_incidents:
+                try:
+                    detections = json.loads(incident.get("detections_json") or "[]")
+                except (TypeError, json.JSONDecodeError):
+                    detections = []
+                record_type = get_record_type(incident)
+                score = incident.get("risk_score")
+                if score is not None:
+                    marker_color = "red" if float(score) >= 60 else ("orange" if float(score) >= 30 else "green")
+                elif detections:
+                    marker_color = "red"
+                else:
+                    marker_color = "blue"
+                popup_text = (
+                    f"Record #{incident.get('id')}<br>Type: {record_type}<br>"
+                    f"Record: {incident.get('image_name') or 'Observation'}<br>"
+                    f"Detected objects: {incident.get('detection_count', 0)}<br>"
+                    f"Risk score: {score if score is not None else 'Not applicable'}"
+                )
+                folium.Marker(
+                    location=[float(incident["latitude"]), float(incident["longitude"])],
+                    tooltip=f"#{incident.get('id')} · {record_type}",
+                    popup=folium.Popup(popup_text, max_width=300),
+                    icon=folium.Icon(color=marker_color, icon="info-sign"),
+                ).add_to(forest_map)
+
+            folium.LayerControl(collapsed=False).add_to(forest_map)
+            st_folium(
+                forest_map, use_container_width=True, height=560,
+                key="firegridnet_gis_map",
+            )
+            if grid_score is None:
+                st.caption("Green cells = forest grid. No risk scenario has been applied yet.")
             else:
-                record_type = "AI Detection"
-
-            map_rows.append({
-                "latitude": float(incident["latitude"]),
-                "longitude": float(incident["longitude"]),
-                "observation_id": incident["id"],
-                "record_type": record_type,
-                "image_name": incident["image_name"] or "Uploaded image",
-                "detected_objects": incident["detection_count"],
-                "risk_score": incident["risk_score"],
-            })
-
-
-        
-        st.map(
-            pd.DataFrame(map_rows),
-            latitude="latitude",
-            longitude="longitude",
-            use_container_width=True,
-        )
-
-        st.subheader("Mapped Observations")
-
-        st.dataframe(
-            pd.DataFrame(map_rows),
-            use_container_width=True,
-            hide_index=True,
-        )
-
-
-        st.subheader("Mapped Observations")
-
-        for incident in mapped_incidents:
-            with st.expander(
-                f"Observation #{incident['id']} — "
-                f"{incident['image_name'] or 'Uploaded image'}"
-            ):
-                st.write(
-                    f"**Recorded:** {incident['timestamp']}"
-                )
-                st.write(
-                    f"**Detected objects:** {incident['detection_count']}"
-                )
-                st.write(
-                    f"**Latitude:** {incident['latitude']}"
-                )
-                st.write(
-                    f"**Longitude:** {incident['longitude']}"
-                )
                 st.caption(
-                    "This is an AI-generated observation, not a "
-                    "confirmed wildfire report."
+                    "Red = higher prototype score (60–100); amber = moderate (30–59.9); "
+                    "green = lower (0–29.9). These colors show a scenario, not verified local risk."
                 )
+            st.caption(
+                "Forest sample counts are not exact forest-coverage percentages. "
+                "Only saved observations with coordinates are plotted."
+            )
+        except Exception as error:
+            st.error(f"Could not render the forest grid: {error}")
     else:
-        st.info(
-            "No saved observations have GPS coordinates yet. "
-            "Try an image containing readable GPS metadata, then "
-            "run AI Analysis."
-        )
+        st.warning("Forest grid file not found: forest_grid_v4.geojson")
 
+    st.divider()
+    st.subheader("🚨 Alerts & Priority Review")
+    higher_risk = [
+        item for item in incidents
+        if item.get("risk_score") is not None and float(item["risk_score"]) >= 60
+    ]
+    new_detection_records = []
+    for item in incidents:
+        try:
+            detections = json.loads(item.get("detections_json") or "[]")
+        except (TypeError, json.JSONDecodeError):
+            detections = []
+        if detections and item.get("status", "New") == "New":
+            new_detection_records.append((item, detections))
+
+    alert_a, alert_b, alert_c = st.columns(3)
+    alert_a.metric("Saved records", len(incidents))
+    alert_b.metric("Higher-risk assessments", len(higher_risk))
+    alert_c.metric("New detections to review", len(new_detection_records))
+    if higher_risk:
+        st.markdown("**Higher-risk weather assessments**")
+        for item in sorted(higher_risk, key=lambda record: float(record["risk_score"]), reverse=True):
+            st.warning(
+                f"Record #{item.get('id')} · score {float(item['risk_score']):.1f}/100 · "
+                f"{item.get('timestamp', 'time unavailable')}"
+            )
+    if new_detection_records:
+        st.markdown("**AI detections awaiting review**")
+        for item, detections in new_detection_records:
+            names = ", ".join(
+                f"{d.get('class', 'object').title()} ({float(d.get('confidence', 0)):.0%})"
+                for d in detections
+            )
+            st.info(f"Record #{item.get('id')} · {item.get('image_name') or 'Uploaded image'} · {names}")
+    if not higher_risk and not new_detection_records:
+        st.success("No saved records currently match the prototype alert rules.")
     st.caption(
-        "Only observations with GPS coordinates are plotted. "
-        "Images without location metadata are not assigned "
-        "an estimated location."
+        "This is an academic prototype alert panel, not a live wildfire alert service. "
+        "Verify urgent conditions with official authorities."
     )
 
-
-
-
+    st.subheader("Mapped Observations")
+    if mapped_incidents:
+        map_rows = [{
+            "ID": incident.get("id"),
+            "Record Type": get_record_type(incident),
+            "Image / Record": incident.get("image_name") or "Uploaded image",
+            "Objects Detected": incident.get("detection_count", 0),
+            "Risk Score": incident.get("risk_score"),
+            "Latitude": float(incident["latitude"]),
+            "Longitude": float(incident["longitude"]),
+            "Status": incident.get("status", "New"),
+        } for incident in mapped_incidents]
+        st.dataframe(pd.DataFrame(map_rows), use_container_width=True, hide_index=True)
+    else:
+        st.info(
+            "No saved observations have coordinates yet. Run an AI analysis or a weather "
+            "assessment with coordinates to add a marker."
+        )
 
 
 elif page == "Incident History":
