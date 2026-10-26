@@ -73,6 +73,7 @@ import rasterio
 from shapely.geometry import Polygon, box
 
 
+
 def identify_forest_cells(
     raster_path: str,
     west: float,
@@ -80,19 +81,12 @@ def identify_forest_cells(
     east: float,
     north: float,
     resolution: int = 5,
+    sample_step: int = 20,
 ) -> list[dict]:
-    """
-    Identify H3 cells containing forest pixels in a local
-    GeoTIFF forest-cover tile.
+    """Estimate forest presence in H3 cells from a GeoTIFF."""
 
-    The raster must use WGS84 coordinates (EPSG:4326).
-    The function expects forest pixels to have value 1.
-    """
-
-    if not Path(raster_path).is_file():
-        raise FileNotFoundError(
-            f"Forest-cover raster not found: {raster_path}"
-        )
+    import rasterio
+    from rasterio.windows import from_bounds
 
     if not (-180 <= west < east <= 180):
         raise ValueError("Invalid longitude bounds.")
@@ -100,53 +94,72 @@ def identify_forest_cells(
     if not (-90 <= south < north <= 90):
         raise ValueError("Invalid latitude bounds.")
 
+    if sample_step < 1:
+        raise ValueError("sample_step must be at least 1.")
+
     with rasterio.open(raster_path) as src:
         if src.crs is None or src.crs.to_epsg() != 4326:
-            raise ValueError(
-                "The raster must use WGS84 (EPSG:4326)."
-            )
+            raise ValueError("Raster must use EPSG:4326.")
 
-        window = rasterio.windows.from_bounds(
+        window = from_bounds(
             west, south, east, north, src.transform
         )
-
         window = window.round_offsets().round_lengths()
-        window = window.intersection(
-            rasterio.windows.Window(
-                0, 0, src.width, src.height
-            )
+
+        full_window = rasterio.windows.Window(
+            0, 0, src.width, src.height
         )
+        window = window.intersection(full_window)
 
         if window.width <= 0 or window.height <= 0:
             return []
 
-        data = src.read(1, window=window)
-        transform = src.window_transform(window)
+        height = int(window.height)
+        width = int(window.width)
 
-    forest_rows, forest_cols = (data == 1).nonzero()
-    cells = {}
+        rows = list(range(0, height, sample_step))
+        cols = list(range(0, width, sample_step))
 
-    for row, col in zip(forest_rows, forest_cols):
-        lon, lat = rasterio.transform.xy(
-            transform, int(row), int(col)
-        )
+        cells = {}
 
-        cell_id = h3.latlng_to_cell(lat, lon, resolution)
+        for row in rows:
+            for col in cols:
+                pixel = src.read(
+                    1,
+                    window=rasterio.windows.Window(
+                        int(window.col_off) + col,
+                        int(window.row_off) + row,
+                        1,
+                        1,
+                    ),
+                )[0, 0]
 
-        if cell_id not in cells:
-            cells[cell_id] = {
-                "cell_id": cell_id,
-                "center_latitude": h3.cell_to_latlng(
-                    cell_id
-                )[0],
-                "center_longitude": h3.cell_to_latlng(
-                    cell_id
-                )[1],
-                "resolution": resolution,
-                "forest_pixels_sampled": 0,
-            }
+                if pixel != 1:
+                    continue
 
-        cells[cell_id]["forest_pixels_sampled"] += 1
+                lon, lat = rasterio.transform.xy(
+                    src.window_transform(window),
+                    row,
+                    col,
+                )
+
+                cell_id = h3.latlng_to_cell(
+                    lat, lon, resolution
+                )
+
+                if cell_id not in cells:
+                    center_lat, center_lon = (
+                        h3.cell_to_latlng(cell_id)
+                    )
+
+                    cells[cell_id] = {
+                        "cell_id": cell_id,
+                        "center_latitude": center_lat,
+                        "center_longitude": center_lon,
+                        "resolution": resolution,
+                        "sampled_forest_blocks": 0,
+                    }
+
+                cells[cell_id]["sampled_forest_blocks"] += 1
 
     return list(cells.values())
-
