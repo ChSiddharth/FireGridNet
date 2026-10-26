@@ -635,7 +635,7 @@ elif page == "Incident Map":
         forest_map = folium.Map(
             location=[35.0, 85.0],
             zoom_start=5,
-            tiles="CartoDB dark_matter"
+            tiles="OpenStreetMap"
         )
 
         folium.GeoJson(
