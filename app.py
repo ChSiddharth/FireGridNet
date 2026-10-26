@@ -623,7 +623,8 @@ elif page == "Incident Map":
     st.write(
         "Explore saved AI detections with available image GPS coordinates."
     )
-        st.subheader("🌲 H3 Forest Grid")
+
+    st.subheader("🌲 H3 Forest Grid")
 
     geojson_path = "forest_grid_v4.geojson"
 
