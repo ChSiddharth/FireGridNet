@@ -5,6 +5,8 @@ import tempfile
 import database
 import requests
 import streamlit as st
+import folium
+from streamlit_folium import st_folium
 import streamlit.components.v1 as components
 from PIL import Image, ExifTags
 from ultralytics import YOLO
