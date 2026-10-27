@@ -12,7 +12,7 @@ from PIL import Image, ExifTags
 from ultralytics import YOLO
 
 st.set_page_config(
-    page_title="FireGridNet | Wildfire Intelligence",
+    page_title="FireGridNet | Global Wildfire GIS",
     page_icon="🔥",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -231,7 +231,7 @@ def get_record_type(incident):
         return "Weather Risk Assessment"
     if name == "Manual Risk Assessment":
         return "Manual Risk Assessment"
-    return "AI Detection"
+    return "Live Imagery & YOLO Detection"
 
 
 # Keep sidebar navigation in sync with Overview shortcuts.
@@ -247,11 +247,11 @@ with st.sidebar:
     page = st.radio(
         "NAVIGATION",
         [
-            "Overview",
-            "AI Detection",
-            "Risk Assessment",
-            "Incident Map",
-            "Incident History",
+            "World Map & India Explorer",
+            "Live Imagery & YOLO Detection",
+            "Grid Weather & Risk Prediction",
+            "Forest Grid Generation",
+            "GIS Evaluation & Incident History",
         ],
         label_visibility="visible",
         key="nav_page",
@@ -266,21 +266,55 @@ with st.sidebar:
 
 # Header
 st.markdown(
-    '<p class="small-muted">WILDFIRE MONITORING / AI-POWERED ANALYSIS</p>',
+    '<p class="small-muted">GLOBAL WILDFIRE GIS / INDIA PILOT</p>',
     unsafe_allow_html=True,
 )
 st.title("🔥 FireGridNet")
 st.caption(
-    "AI-Powered Wildfire Detection & Risk Assessment"
+    "World map • India forest pilot • Grid risk • YOLO fire/smoke detection"
 )
 st.divider()
 
 
-if page == "Overview":
+if page == "World Map & India Explorer":
+    st.subheader("🌍 World Map & India Forest Explorer")
+    st.write(
+        "The map displays all seven continents. India is the first active study area; "
+        "other countries remain visible but are not yet enabled for forest-grid analysis."
+    )
+    region_col, status_col = st.columns([2, 3])
+    with region_col:
+        selected_region = st.selectbox(
+            "Study region", ["World overview (all continents)", "India (active pilot)", "Other regions (planned)"],
+            key="world_study_region"
+        )
+    with status_col:
+        st.info("Active workflow: India only · Global expansion will use the same five modules.")
+    if selected_region == "Other regions (planned)":
+        st.warning("Other regions are visible on the world map, but analysis is not enabled there yet. Select India to continue.")
+    elif selected_region == "World overview (all continents)":
+        st.caption("Global overview mode: all continents are visible. Select India (active pilot) to zoom into the first supported study area.")
+    world_center = [20.5937, 78.9629] if selected_region == "India (active pilot)" else [15, 0]
+    world_zoom = 4 if selected_region == "India (active pilot)" else 2
+    world_map = folium.Map(
+        location=world_center, zoom_start=world_zoom,
+        tiles="OpenStreetMap", control_scale=True,
+        world_copy_jump=True,
+    )
+    folium.Marker(
+        [20.5937, 78.9629],
+        tooltip="India — active pilot region",
+        popup="FireGridNet currently enables the forest workflow for India.",
+        icon=folium.Icon(color="green", icon="globe"),
+    ).add_to(world_map)
+    folium.LayerControl(collapsed=True).add_to(world_map)
+    st_folium(world_map, use_container_width=True, height=470, key="firegridnet_world_map")
+    st.caption("Basemap: OpenStreetMap. Forest boundaries and grid coverage are only shown where verified data is available; this marker is not a forest boundary.")
+    st.divider()
     st.subheader("Monitoring Overview")
     st.write(
-        "A unified workspace for visual fire detection, "
-        "weather analysis and wildfire incident monitoring."
+        "A five-module research prototype combining world-map navigation, "
+        "India forest grids, weather-risk scenarios, YOLO detection, and GIS incident review."
     )
 
     saved_for_overview = database.get_incidents()
@@ -316,36 +350,36 @@ if page == "Overview":
             "Analyse an uploaded image for possible fire and smoke, "
             "with bounding boxes and confidence scores."
         )
-        if st.button("Open AI Detection", use_container_width=True):
-            st.session_state["navigation_target"] = "AI Detection"
+        if st.button("Open YOLO Detection", use_container_width=True):
+            st.session_state["navigation_target"] = "Live Imagery & YOLO Detection"
             st.rerun()
 
         st.markdown("### 🌦️ Environmental Risk")
         st.write(
-            "Retrieve weather for a selected location and view "
-            "an experimental weather-based risk estimate."
+            "Retrieve weather for a selected location and view a documented, "
+            "experimental weather-based risk estimate."
         )
-        if st.button("Open Risk Assessment", use_container_width=True):
-            st.session_state["navigation_target"] = "Risk Assessment"
+        if st.button("Open Grid Weather & Risk", use_container_width=True):
+            st.session_state["navigation_target"] = "Grid Weather & Risk Prediction"
             st.rerun()
 
     with right:
         st.markdown("### 🗺️ Incident Geography")
         st.write(
-            "Explore the H3 forest grid, saved observation markers, "
-            "and a clearly labelled prototype risk overlay."
+            "Generate and inspect the available forest grid, boundaries, "
+            "saved observation markers, and prototype risk overlay."
         )
-        if st.button("Open Incident Map", use_container_width=True):
-            st.session_state["navigation_target"] = "Incident Map"
+        if st.button("Open Forest Grid", use_container_width=True):
+            st.session_state["navigation_target"] = "Forest Grid Generation"
             st.rerun()
 
         st.markdown("### 📋 Incident Records")
         st.write(
-            "Review saved AI detections and weather assessments, "
-            "filter records, and update their review status."
+            "Review GIS-linked incidents, saved AI detections, and weather assessments; "
+            "filter records and update review status."
         )
-        if st.button("Open Incident History", use_container_width=True):
-            st.session_state["navigation_target"] = "Incident History"
+        if st.button("Open GIS Evaluation & History", use_container_width=True):
+            st.session_state["navigation_target"] = "GIS Evaluation & Incident History"
             st.rerun()
 
     st.divider()
@@ -375,7 +409,7 @@ if page == "Overview":
     st.caption("Alerts use saved app records only; no emergency service or live wildfire feed is connected.")
 
 
-elif page == "AI Detection":
+elif page == "Live Imagery & YOLO Detection":
     st.subheader("AI Fire & Smoke Detection")
     st.write(
         "Upload an image to inspect possible visible fire or smoke."
@@ -524,7 +558,7 @@ elif page == "AI Detection":
 
 
 
-elif page == "Risk Assessment":
+elif page == "Grid Weather & Risk Prediction":
     st.subheader("Environmental Risk Assessment")
     st.caption(
         "Weather data is model-based and may not represent conditions "
@@ -720,12 +754,12 @@ elif page == "Risk Assessment":
 
 
 
-elif page == "Incident Map":
-    st.subheader("🗺️ GIS Incident & Grid Risk Map")
+elif page == "Forest Grid Generation":
+    st.subheader("🧩 Forest Grid Generation & GIS Map")
     st.write(
-        "Explore the H3 forest grid and saved observations. The risk overlay "
-        "uses the latest experimental weather score as a scenario for every cell; "
-        "it is not a separate prediction for each cell."
+        "Inspect the available grid polygons and saved observations. The current GeoJSON "
+        "is a prototype grid layer, not a nationwide forest-boundary dataset. The risk "
+        "overlay uses the latest experimental score uniformly; it is not per-cell prediction."
     )
 
     incidents = database.get_incidents()
@@ -759,7 +793,7 @@ elif page == "Incident Map":
                 forest_data = json.load(file)
 
             forest_map = folium.Map(
-                location=[35.0, 85.0], zoom_start=5,
+                location=[22.5, 79.0], zoom_start=4,
                 tiles="OpenStreetMap", control_scale=True,
             )
 
@@ -791,7 +825,15 @@ elif page == "Incident Map":
                     ],
                     localize=True,
                 )
-            folium.GeoJson(**geojson_kwargs).add_to(forest_map)
+            grid_layer = folium.GeoJson(**geojson_kwargs).add_to(forest_map)
+            # Fit the initial view to the actual polygon extent so cells are not hidden
+            # outside the default map viewport.
+            try:
+                grid_bounds = grid_layer.get_bounds()
+                if grid_bounds and len(grid_bounds) == 2:
+                    forest_map.fit_bounds(grid_bounds)
+            except Exception:
+                pass
 
             for incident in mapped_incidents:
                 try:
@@ -838,7 +880,7 @@ elif page == "Incident Map":
         except Exception as error:
             st.error(f"Could not render the forest grid: {error}")
     else:
-        st.warning("Forest grid file not found: forest_grid_v4.geojson")
+        st.warning("Forest grid file not found: forest_grid_v4.geojson. Confirm this file is committed in the same GitHub repository directory as app.py.")
 
     st.divider()
     st.subheader("🚨 Alerts & Priority Review")
@@ -901,8 +943,8 @@ elif page == "Incident Map":
         )
 
 
-elif page == "Incident History":
-    st.subheader("Incident History")
+elif page == "GIS Evaluation & Incident History":
+    st.subheader("GIS Evaluation & Incident History")
     st.write(
         "Review fire and smoke detections saved by FireGridNet."
     )
@@ -939,7 +981,7 @@ elif page == "Incident History":
                      if incident["image_name"] == "Weather Risk Assessment"
                      else "Manual Risk Assessment"
                      if incident["image_name"] == "Manual Risk Assessment"
-                     else "AI Detection"
+                     else "Live Imagery & YOLO Detection"
             ),
                 "Objects Detected": incident["detection_count"],
                 "Detection Details": detection_summary or "None",
@@ -962,7 +1004,7 @@ elif page == "Incident History":
                 "Record Type",
                 [
                     "All Types",
-                    "AI Detection",
+                    "Live Imagery & YOLO Detection",
                     "Weather Risk Assessment",
                     "Manual Risk Assessment",
                 ],
